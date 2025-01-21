@@ -1,0 +1,1 @@
+const THEME_COLOR = 'red'
