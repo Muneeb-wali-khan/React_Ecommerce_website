@@ -5,6 +5,10 @@ import Dashboard from "./pages/Admin/Dashboard";
 import HomeUser from "./pages/User/HomeUser";
 import ProductsAdmin from "./pages/Admin/ProductsAdmin";
 import Products from "./pages/User/Products/Products";
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination"; 
+
 
 // routes
 function App() {
