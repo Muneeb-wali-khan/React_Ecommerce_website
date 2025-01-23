@@ -4,7 +4,12 @@ const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 const app = express();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: process.env.ORIGIN,
+    credentials: true,
+  })
+);
 
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
@@ -34,4 +39,4 @@ app.use((error, req, res, next) => {
   });
 });
 
-module.exports =  { app };
+module.exports = { app };

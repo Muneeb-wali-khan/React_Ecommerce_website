@@ -1,10 +1,12 @@
-const Product = require("../models/productModel")
-const asyncHandler = require("../utils/asyncHandler")
-const cloudinary = require("cloudinary")
+const Product = require("../models/productModel");
+const asyncHandler = require("../utils/asyncHandler");
+const cloudinary = require("cloudinary");
+const ApiError = require("../utils/ApiError");
+const ApiResponse = require("../utils/ApiResponse");
 
 exports.createProduct = asyncHandler(async (req, res) => {
     const images = req.file.path;
-    req.body.user = req.user._id
+    req.body.user = req.user._id;
 
     const myCloud = await cloudinary.v2.uploader.upload(images, {
         folder: "products",
@@ -14,246 +16,120 @@ exports.createProduct = asyncHandler(async (req, res) => {
 
     const imagesUp = [{
         public_id: myCloud.public_id,
-        url: myCloud.secure_url
-    }]
+        url: myCloud.secure_url,
+    }];
 
-    req.body.images = imagesUp
+    req.body.images = imagesUp;
 
-    console.log("done cloud");
-
-    const product = await Product.create(req.body)
-
-    console.log("done image");
+    const product = await Product.create(req.body);
 
     if (product) {
-
-        return res.status(201).json({
-            success: true,
-            msg: "product created successfully",
-        })
-
+        return res.status(201).json(new ApiResponse(201, null, "Product created successfully"));
+    } else {
+        throw new ApiError(400, "Product creation failed");
     }
-    else {
-        return res.status(400).json({
-            success: false,
-            msg: "product creation failed !"
-        })
-    }
-})
-
-
-
-
-// AllProducts + search + pagination
+});
 
 exports.allProducts = asyncHandler(async (req, res) => {
-    // Number of products to show per page
     const resultPerPage = 4;
-
-    // Extract the requested page number from the URL's query parameters. Default to page 1 if not provided.
     const pageNo = Number(req.query.page) || 1;
-
-    // make empty object for filter 
     const filters = {};
-    const allCategories = (await Product.find().distinct("category"));
+    const allCategories = await Product.find().distinct("category");
 
-    // filter by product name
     if (req.query.keyword) {
-        filters.name = {
-            $regex: req.query.keyword,
-            $options: "i"
-        };
+        filters.name = { $regex: req.query.keyword, $options: "i" };
     }
 
-    // filter by category
     if (req.query.category) {
         filters.category = req.query.category;
     }
 
-    // filter by min max price
     if (req.query.minPrice && req.query.maxPrice) {
-        filters.price = {
-            $gte: req.query.minPrice, // from like 200
-            $lte: req.query.maxPrice // to like 300
-        };
+        filters.price = { $gte: req.query.minPrice, $lte: req.query.maxPrice };
     }
 
-    // Count the total number of products that match the filters
     const totalProducts = await Product.countDocuments(filters);
-
-    // Fetch products based on the filters and pagination parameters
     const products = await Product.find(filters)
         .limit(resultPerPage)
         .skip(resultPerPage * (pageNo - 1));
 
-    const AllPRODUCTS = await Product.find()
+    const allProducts = await Product.find();
 
-
-    return res.json({ products, AllPRODUCTS, pageNo, resultPerPage, allCategories, pages: Math.ceil(totalProducts / resultPerPage), totalProducts });
-
+    return res.status(200).json(new ApiResponse(200, {
+        products,
+        allProducts,
+        pageNo,
+        resultPerPage,
+        allCategories,
+        pages: Math.ceil(totalProducts / resultPerPage),
+        totalProducts,
+    }, "Products fetched successfully"));
 });
-
-
-
-
-
-
-// update PRODUCT  --- admin
 
 exports.updateProduct = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id);
 
-
     if (!product) {
-        return res.status(400).json({
-            success: false,
-            err: "product not found"
-        })
-    }
-    else {
-        if (req.body.images === "") {
-            const product = await Product.findById(req.params.id)
-
-            req.body.images = {
-                public_id: product.images[0].public_id,
-                url: product.images[0].url
-            }
-            const products = await Product.findByIdAndUpdate(req.params.id, req.body, {
-                new: true,
-                runValidators: true,
-                useFindAndModify: false,
-            });
-
-            if (products) {
-                return res.status(200).json({
-                    success: true,
-                    msg: "Product Updated Successfully 🤩",
-                });
-            }
-            else {
-                return res.status(400).json({
-                    success: false,
-                    err: "Product Updation Failed !"
-                })
-            }
-
-        }
-        else {
-            const images = req.file.path;
-            const products = await Product.findById(req.params.id)
-            const imageId = products.images[0].public_id;
-            if (imageId) {
-
-                await cloudinary.v2.uploader.destroy(imageId);
-            }
-
-            const myCloud = await cloudinary.v2.uploader.upload(images, {
-                folder: "products",
-                width: 300,
-                crop: "scale",
-            });
-
-            const product = await Product.findByIdAndUpdate(req.params.id,
-                {
-                    name: req.body.name,
-                    description: req.body.description,
-                    price: req.body.price,
-                    category: req.body.category,
-                    stock: req.body.stock,
-
-                    images: [{
-                        public_id: myCloud.public_id,
-                        url: myCloud.secure_url
-                    }]
-                }
-                , {
-                    new: true,
-                    runValidators: true,
-                    useFindAndModify: false,
-                })
-
-            if (product) {
-                return res.status(200).json({
-                    success: true,
-                    msg: "Product Updated Successfully 🤩",
-                });
-            }
-            else {
-                return res.status(400).json({
-                    success: false,
-                    err: "Product Updation Failed !"
-                })
-            }
-
-        }
-
-
-
+        throw new ApiError(404, "Product not found");
     }
 
+    if (req.body.images === "") {
+        req.body.images = {
+            public_id: product.images[0].public_id,
+            url: product.images[0].url,
+        };
+    } else {
+        const images = req.file.path;
+        const imageId = product.images[0].public_id;
+        if (imageId) await cloudinary.v2.uploader.destroy(imageId);
 
-})
+        const myCloud = await cloudinary.v2.uploader.upload(images, {
+            folder: "products",
+            width: 300,
+            crop: "scale",
+        });
 
+        req.body.images = [{
+            public_id: myCloud.public_id,
+            url: myCloud.secure_url,
+        }];
+    }
 
+    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, {
+        new: true,
+        runValidators: true,
+        useFindAndModify: false,
+    });
 
-// delete product --admin
+    if (updatedProduct) {
+        return res.status(200).json(new ApiResponse(200, null, "Product updated successfully"));
+    } else {
+        throw new ApiError(400, "Product update failed");
+    }
+});
 
 exports.deleteProduct = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id);
 
     if (!product) {
-        return res.status(400).json({
-            success: false,
-            err: "product not found"
-        })
-    }
-    else {
-        const delPr = await Product.findByIdAndDelete(req.params.id)
-
-        if (delPr) {
-
-            return res.status(201).json({
-                success: true,
-                msg: "product deleted successfully"
-            })
-        }
-        else {
-            return res.status(400).json({
-                success: false,
-                err: "failed to delete product !"
-            })
-
-        }
+        throw new ApiError(404, "Product not found");
     }
 
+    await Product.findByIdAndDelete(req.params.id);
 
-
-})
-
-
-
-// get Product details 
+    return res.status(200).json(new ApiResponse(200, null, "Product deleted successfully"));
+});
 
 exports.getProductDetails = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id);
 
     if (!product) {
-        return res.status(400).json({
-            success: false,
-            msg: "product not found"
-        })
+        throw new ApiError(404, "Product not found");
     }
-    else {
-        return res.status(201).json({
-            success: true,
-            product
-        })
-    }
-})
 
+    return res.status(200).json(new ApiResponse(200, product, "Product details fetched successfully"));
+});
 
-
-// create product reveiwe
 exports.createProductReview = asyncHandler(async (req, res) => {
     const { productId, comment, rating } = req.body;
 
@@ -265,140 +141,70 @@ exports.createProductReview = asyncHandler(async (req, res) => {
         createdAt: new Date().toLocaleDateString('en-US', {
             day: 'numeric',
             month: 'numeric',
-            year: 'numeric'
-        })
-    }
-
-    console.log('review:', review);
+            year: 'numeric',
+        }),
+    };
 
     const product = await Product.findById(productId);
 
-
     if (!product) {
-        return res.status(404).json({
-            err: 'Product not found',
-            success: false
-        })
+        throw new ApiError(404, "Product not found");
     }
 
-    const existingReviwed = product.reveiws.findIndex(
-        r => r.user.toString() === req.user._id.toString() // user id in reveiwes array if equals to the userid of loged in so 
-    )
+    const existingReviewIndex = product.reveiws.findIndex(
+        (r) => r.user.toString() === req.user._id.toString()
+    );
 
-    if (existingReviwed !== -1) {
-        product.reveiws[existingReviwed].comment = comment;
-        product.reveiws[existingReviwed].rating = rating;
+    if (existingReviewIndex !== -1) {
+        product.reveiws[existingReviewIndex].comment = comment;
+        product.reveiws[existingReviewIndex].rating = rating;
+    } else {
+        product.reveiws.push(review);
+    }
 
-    }
-    else {
-        product.reveiws.push(review)
-    }
     product.numOfReviews = product.reveiws.length;
+    product.ratings = product.reveiws.reduce((acc, r) => acc + r.rating, 0) / product.reveiws.length;
 
-    let avg = 0;
-    product.reveiws.forEach(r => (avg += r.rating));
-    product.ratings = avg / product.reveiws.length;
+    await product.save({ validateBeforeSave: false });
 
-
-    const savedR = await product.save({ validateBeforeSave: false });
-
-    if (savedR) {
-        return res.status(200).json({
-            success: true,
-            msg: "reveiwe added successfully 🤩",
-        });
-    }
-    else {
-        return res.status(400).json({
-            success: false,
-            err: "reveiwe adding failed !"
-        })
-    }
-
-})
-
-
-
-
-
-// get all reveiwes of single product
-
+    return res.status(200).json(new ApiResponse(200, null, "Review added successfully"));
+});
 
 exports.getProductReviews = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.query.id);
 
     if (!product) {
-        return next(new errorHandler("Product not found", 404));
+        throw new ApiError(404, "Product not found");
     }
 
-    return res.status(200).json({
-        success: true,
-        reviews: product.reveiws
-    });
+    return res.status(200).json(new ApiResponse(200, product.reveiws, "Reviews fetched successfully"));
+});
 
-})
-
-
-
-
-// delete product revivewe
-
-exports.deleteProductReview = asyncHandler(async (req, res, next) => {
-
+exports.deleteProductReview = asyncHandler(async (req, res) => {
     const { productId, id } = req.query;
 
     const product = await Product.findById(productId);
 
     if (!product) {
-        return res.status(404).json({
-            err: 'Product not found',
-            success: false
-        })
+        throw new ApiError(404, "Product not found");
     }
 
-    const reviewToDelete = product.reveiws.find((r) => r._id.toString() === id);
+    const reviewIndex = product.reveiws.findIndex((r) => r._id.toString() === id);
 
-    if (!reviewToDelete) {
-        return res.status(404).json({
-            err: 'Reviewe not found',
-            success: false
-        })
+    if (reviewIndex === -1) {
+        throw new ApiError(404, "Review not found");
     }
 
-    if (reviewToDelete.user.toString() !== req.user._id.toString()) {
-
-        return res.status(403).json({
-            err: 'You are not authorized to delete this review',
-            success: false
-        })
+    if (product.reveiws[reviewIndex].user.toString() !== req.user._id.toString()) {
+        throw new ApiError(403, "You are not authorized to delete this review");
     }
 
-    // Remove the review if user matched
-    const rev = product.reveiws = product.reveiws.filter((r) => r._id.toString() !== id);
+    product.reveiws.splice(reviewIndex, 1);
 
-    // Calculate the new average rating and update the product's properties
-
-    let avg = 0;
-    if (rev.length > 0) {
-        rev.forEach((rev) => {
-            avg += rev.rating;
-        });
-        avg /= rev.length;
-    }
-
-    const numOfReviews = rev.length;
-
-    const updatedReveiweAfterDelete = await Product.findByIdAndUpdate(req.query.productId, { rev, ratings: avg, numOfReviews }, {
-        new: true,
-        runValidators: true,
-        useFindAndModify: false
-    })
+    product.numOfReviews = product.reveiws.length;
+    product.ratings = product.reveiws.reduce((acc, r) => acc + r.rating, 0) / product.numOfReviews || 0;
 
     await product.save({ validateBeforeSave: false });
 
-    res.status(200).json({
-        success: true,
-        msg: "reveiwe deleted successfully  ㅤ"
-    });
-
-})
+    return res.status(200).json(new ApiResponse(200, null, "Review deleted successfully"));
+});
