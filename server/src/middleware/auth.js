@@ -1,9 +1,9 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
-const expressAsyncHandler = require('express-async-handler');
+const asyncHandler = require("../utils/asyncHandler")
 
 
-exports.isAuthenticated = expressAsyncHandler(async (req, res, next) => {
+exports.isAuthenticated = asyncHandler(async (req, res, next) => {
 
     const { token } = req.cookies
 

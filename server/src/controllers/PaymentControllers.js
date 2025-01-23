@@ -1,4 +1,4 @@
-const asyncHandler = require("express-async-handler");
+const asyncHandler = require("../utils/asyncHandler")
 
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 

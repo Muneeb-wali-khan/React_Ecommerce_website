@@ -1,6 +1,6 @@
 const User = require("../models/userModel")
-const asyncHandler = require("express-async-handler")
-const bcrypt = require("bcryptjs")
+const asyncHandler = require("../utils/asyncHandler")
+const bcrypt = require("bcrypt")
 const jwt = require("jsonwebtoken")
 const sendEmail = require("../utils/sendMailForgotPassword")
 const crypto = require('crypto');
@@ -12,8 +12,6 @@ exports.registerUser = asyncHandler(async (req, res) => {
     try {
         const { username, email, password } = req.body;
         const avatar = req.file.path
-        // console.log("Received avatar data:", avatar);
-        // console.log("Received request body:", req.body);
 
         const user = await User.findOne({ email: email })
         if (user) {
