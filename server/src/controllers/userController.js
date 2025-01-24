@@ -4,24 +4,21 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const sendEmail = require("../utils/sendMailForgotPassword");
 const crypto = require("crypto");
-const cloudinary = require("cloudinary");
 const ms = require("ms");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
+const { cloudinaryUploadImg, RemovecloudinaryExistingImg } = require("../utils/cloudinary");
+const extractId = require("../utils/extractCloudinaryId");
 
 // Register user
 exports.registerUser = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
-  const avatar = req.file.path;
+  const avatar = req?.file?.path;
 
   const existingUser = await User.findOne({ email });
   if (existingUser) throw new ApiError(409, "User already exists");
 
-  const myCloud = await cloudinary.uploader.upload(avatar, {
-    folder: "avatars",
-    width: 150,
-    crop: "scale",
-  });
+  const myCloud = await cloudinaryUploadImg(avatar)
 
   const salt = await bcrypt.genSalt(10);
   const hashPassword = await bcrypt.hash(password, salt);
@@ -30,10 +27,7 @@ exports.registerUser = asyncHandler(async (req, res) => {
     username,
     email,
     password: hashPassword,
-    avatar: {
-      public_id: myCloud.public_id,
-      url: myCloud.secure_url,
-    },
+    avatar: myCloud.secure_url
   });
 
   res.status(201).json(new ApiResponse(201, newUser, "User created successfully"));
@@ -49,9 +43,18 @@ exports.loginUser = asyncHandler(async (req, res) => {
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) throw new ApiError(401, "Password does not match");
 
-  const token = jwt.sign({ id: user._id }, process.env.Jwt_Secret_Key, {
-    expiresIn: process.env.Jwt_Expire_Time,
-  });
+  const token = jwt.sign(
+    { id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role
+     }, 
+    process.env.Jwt_Secret_Key, 
+    { 
+      expiresIn: process.env.Jwt_Expire_Time,
+      algorithm: 'HS256' 
+    }
+  );
 
   const options = {
     expires: new Date(Date.now() + ms(process.env.COOKIE_EXPIRE)),
@@ -75,29 +78,31 @@ exports.logoutUser = asyncHandler(async (req, res) => {
 
 // Forgot password
 exports.forgotPassword = asyncHandler(async (req, res) => {
-  const user = await User.findOne({ email: req.body.email });
-  if (!user) throw new ApiError(404, "Email not found");
+console.log(req)
+  
+  // const user = await User.findOne({ email: req.body.email });
+  // if (!user) throw new ApiError(404, "Email not found");
 
-  const resetToken = user.getResetPasswordToken();
-  await user.save({ validateBeforeSave: false });
+  // const resetToken = user.resetPasswordToken;
+  // await user.save({ validateBeforeSave: false });
 
-  const resetUrl = `http://localhost:4000/password/reset/${resetToken}`;
-  const message = `Your password reset token is:\n\n${resetUrl}\n\nIf you did not request this, please ignore it.`;
+  // const resetUrl = `http://localhost:3000/password/reset/${resetToken}`;
+  // const message = `Your password reset token is:\n\n${resetUrl}\n\nIf you did not request this, please ignore it.`;
 
-  try {
-    await sendEmail({
-      email: user.email,
-      subject: "Password Recovery",
-      message,
-    });
+  // try {
+  //   await sendEmail({
+  //     email: user.email,
+  //     subject: "Password Recovery",
+  //     message,
+  //   });
 
-    res.status(200).json(new ApiResponse(200, null, `Email sent successfully to ${user.email}`));
-  } catch (error) {
-    user.resetPasswordToken = undefined;
-    user.resetPasswordTokenExpire = undefined;
-    await user.save({ validateBeforeSave: false });
-    throw new ApiError(500, "Failed to send the email");
-  }
+  //   res.status(200).json(new ApiResponse(200, null, `Email sent successfully to ${user.email}`));
+  // } catch (error) {
+  //   user.resetPasswordToken = undefined;
+  //   user.resetPasswordTokenExpire = undefined;
+  //   await user.save({ validateBeforeSave: false });
+  //   throw new ApiError(500, "Failed to send the email");
+  // }
 });
 
 // Reset password
@@ -238,7 +243,9 @@ exports.updateUserRole = asyncHandler(async (req, res) => {
 exports.deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw new ApiError(404, "User not found");
-
+  const publicId = extractId(user?.avatar)
+  const deletAvatar = await RemovecloudinaryExistingImg(publicId)
+  
   await User.findByIdAndDelete(req.params.id);
 
   res.status(200).json(new ApiResponse(200, null, "User deleted successfully"));

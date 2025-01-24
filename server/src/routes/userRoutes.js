@@ -1,11 +1,13 @@
 const express = require("express")
 const { registerUser, loginUser, logoutUser, forgotPassword, resetPassword, getUserDetails, updateUserPassword, updateUserProfile, getAllUsers, getSingleUser, updateUserRole, deleteUser } = require("../controllers/userController")
 
-const { isAuthenticated, AdminRoute } = require("../middleware/auth")
+const { isAuthenticated, AdminRoute, limitRequests } = require("../middleware/auth")
 const router = express.Router()
 const upload = require("../middleware/multer")
+const multer = require("multer")
+const ApiError = require("../utils/ApiError")
 
-router.route('/registerUser').post(upload.single('avatar'), registerUser)
+router.route('/registerUser').post(limitRequests,upload.single('avatar'), registerUser)
 router.route('/loginUser').post(loginUser)
 router.route('/logoutUser').get(logoutUser)
 router.route('/forgot/password').post(forgotPassword)
@@ -24,7 +26,22 @@ router.route('/admin/deleteUser/:id').delete(isAuthenticated, AdminRoute("admin"
 
 
 
-
+// Error handling middleware for MulterError o file exceeded
+router.use((err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        // Customize the error message for file size limit
+        throw new ApiError(500, "File/image size must be 500 KB or less");
+      }
+    }
+    if(err instanceof multer.MulterError){
+      if(err.code === "LIMIT_UNEXPECTED_FILE"){
+        throw new ApiError(500, "Only image is allowed !")
+      }
+    }
+    next(err);
+});
+    
 
 
 

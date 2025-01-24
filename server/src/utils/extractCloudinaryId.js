@@ -6,4 +6,4 @@ function extractId(url) {
     return publicId[0]
 }
 
-export {extractId}
+module.exports = extractId
