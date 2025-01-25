@@ -20,14 +20,12 @@ exports.registerUser = asyncHandler(async (req, res) => {
 
   const myCloud = await cloudinaryUploadImg(avatar)
 
-  const salt = await bcrypt.genSalt(10);
-  const hashPassword = await bcrypt.hash(password, salt);
 
   const newUser = await User.create({
     username,
     email,
-    password: hashPassword,
-    avatar: myCloud.secure_url
+    password:password,
+    avatar: myCloud?.secure_url
   });
 
   res.status(201).json(new ApiResponse(201, newUser, "User created successfully"));
@@ -40,15 +38,24 @@ exports.loginUser = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email }).select("+password");
   if (!user) throw new ApiError(404, "User does not exist");
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) throw new ApiError(401, "Password does not match");
+  // Ensure password comparison works
+  const isMatch = await bcrypt.compare(
+    password, 
+    user.password  // Remove optional chaining
+  );
+
+  if (!isMatch) {
+    console.log("Password comparison failed");
+    throw new ApiError(401, "Incorrect password");
+  }
 
   const token = jwt.sign(
-    { id: user._id,
+    { 
+      id: user._id,
       username: user.username,
       email: user.email,
       role: user.role
-     }, 
+    }, 
     process.env.Jwt_Secret_Key, 
     { 
       expiresIn: process.env.Jwt_Expire_Time,
@@ -66,7 +73,6 @@ exports.loginUser = asyncHandler(async (req, res) => {
   res.cookie("token", token, options);
   res.status(200).json(new ApiResponse(200, { token }, "User logged in successfully"));
 });
-
 // Logout user
 exports.logoutUser = asyncHandler(async (req, res) => {
   res.clearCookie("token", null, {
@@ -78,36 +84,38 @@ exports.logoutUser = asyncHandler(async (req, res) => {
 
 // Forgot password
 exports.forgotPassword = asyncHandler(async (req, res) => {
-console.log(req)
+  console.log("Current User:", req.user);
   
-  // const user = await User.findOne({ email: req.body.email });
-  // if (!user) throw new ApiError(404, "Email not found");
+  const user = await User.findOne({ email: req.body.email });
+  if (!user) throw new ApiError(404, "Email not found");
 
-  // const resetToken = user.resetPasswordToken;
-  // await user.save({ validateBeforeSave: false });
+  const resetToken = user.getResetPasswordToken();
+  await user.save({ validateBeforeSave: false });
 
-  // const resetUrl = `http://localhost:3000/password/reset/${resetToken}`;
-  // const message = `Your password reset token is:\n\n${resetUrl}\n\nIf you did not request this, please ignore it.`;
+  const resetUrl = `http://localhost:3000/password/reset/${resetToken}`;
+  const message = `Your password reset token is:\n\n${resetUrl}\n\nIf you did not request this, please ignore it.`;
 
-  // try {
-  //   await sendEmail({
-  //     email: user.email,
-  //     subject: "Password Recovery",
-  //     message,
-  //   });
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: "Password Recovery",
+      message,
+    });
 
-  //   res.status(200).json(new ApiResponse(200, null, `Email sent successfully to ${user.email}`));
-  // } catch (error) {
-  //   user.resetPasswordToken = undefined;
-  //   user.resetPasswordTokenExpire = undefined;
-  //   await user.save({ validateBeforeSave: false });
-  //   throw new ApiError(500, "Failed to send the email");
-  // }
+    res.status(200).json(new ApiResponse(200, null, `Email sent successfully to ${user.email}`));
+  } catch (error) {
+    user.resetPasswordToken = undefined;
+    user.resetPasswordTokenExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+    throw new ApiError(500, "Failed to send the email");
+  }
 });
 
 // Reset password
 exports.resetPassword = asyncHandler(async (req, res) => {
   const { password, confirmPassword } = req.body;
+  
+  // Verify token before finding user
   const resetPasswordToken = crypto
     .createHash("sha256")
     .update(req.params.token)
@@ -115,21 +123,27 @@ exports.resetPassword = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({
     resetPasswordToken,
-    resetPasswordTokenExpire: { $gt: Date.now() },
-  });
-  if (!user) throw new ApiError(400, "Invalid or expired token");
+    resetPasswordTokenExpire: { $gt: Date.now() }
+  }).select('+password');
 
-  if (password !== confirmPassword)
+  if (!user) {
+    throw new ApiError(400, "Invalid or expired reset token");
+  }
+
+  if (password !== confirmPassword) {
     throw new ApiError(400, "Passwords do not match");
+  }
 
-  const salt = await bcrypt.genSalt(10);
-  user.password = await bcrypt.hash(password, salt);
+  
+  user.password = password;
   user.resetPasswordToken = undefined;
   user.resetPasswordTokenExpire = undefined;
 
-  await user.save();
+  await user.save({ validateBeforeSave: false });
+
   res.status(200).json(new ApiResponse(200, null, "Password reset successfully"));
 });
+
 
 // Get logged-in user details
 exports.getUserDetails = asyncHandler(async (req, res) => {
@@ -165,47 +179,47 @@ exports.updateUserPassword = asyncHandler(async (req, res) => {
 });
 
 // Update logged-in user profile
-exports.updateUserProfile = asyncHandler(async (req, res) => {
-  const { username, email, avatar } = req.body;
-  const users = await User.findById(req.user.id);
+exports.updateUserProfileDetails = asyncHandler(async (req, res) => {
+  const { username, email } = req.body;
+  const users = await User.findById(req.user?._id);
   if (!users) throw new ApiError(404, "User not found");
 
-  const newData = { username, email };
-
-  if (avatar === "") {
-    newData.avatar = {
-      public_id: users.avatar[0].public_id,
-      url: users.avatar[0].url,
-    };
-  } else {
-    const avatarPath = req.file.path;
-    const imageId = users.avatar[0].public_id;
-    await cloudinary.v2.uploader.destroy(imageId);
-
-    const myCloud = await cloudinary.v2.uploader.upload(avatarPath, {
-      folder: "avatars",
-      width: 150,
-      crop: "scale",
-    });
-
-    newData.avatar = [{
-      public_id: myCloud.public_id,
-      url: myCloud.secure_url,
-    }];
-  }
-
   const user = await User.findByIdAndUpdate(
-    req.user.id,
-    newData,
+    req.user?._id,
+    {
+      username:username,
+      email:email,
+    },
     {
       new: true,
-      runValidators: true,
-      useFindAndModify: false,
     }
   );
 
   res.status(200).json(new ApiResponse(200, user, "User updated successfully 🤩"));
 });
+
+// update user avatar pic
+exports.updateUserAvatar = asyncHandler(async (req,res)=>{
+  const avatar = req?.file?.path;
+  const user = await User.findById(req.user?._id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  const publicId = extractId(user?.avatar)
+  const deletAvatar = await RemovecloudinaryExistingImg(publicId)
+
+  const myCloud = await cloudinaryUploadImg(avatar)
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      avatar:myCloud?.secure_url
+    },
+    {
+      new: true,
+    }
+  );
+
+  res.status(200).json(new ApiResponse(200, updatedUser, "User updated successfully 🤩"));
+})
 
 // Get all users (Admin)
 exports.getAllUsers = asyncHandler(async (req, res) => {
@@ -226,15 +240,13 @@ exports.updateUserRole = asyncHandler(async (req, res) => {
   const { role } = req.body;
   const user = await User.findByIdAndUpdate(
     req.params.id,
-    { role },
+    { role:role },
     {
       new: true,
-      runValidators: true,
-      useFindAndModify: false,
     }
   );
 
-  if (!user) throw new ApiError(500, "An error occurred while updating the user role");
+  if (!user) throw new ApiError(500, "error updating the user role");
 
   res.status(200).json(new ApiResponse(200, null, "User role updated successfully"));
 });

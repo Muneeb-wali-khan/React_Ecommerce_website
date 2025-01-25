@@ -1,5 +1,8 @@
 const express = require("express")
-const { registerUser, loginUser, logoutUser, forgotPassword, resetPassword, getUserDetails, updateUserPassword, updateUserProfile, getAllUsers, getSingleUser, updateUserRole, deleteUser } = require("../controllers/userController")
+const { registerUser, loginUser, logoutUser, forgotPassword, resetPassword, getUserDetails, updateUserPassword, getAllUsers, getSingleUser, updateUserRole, deleteUser
+ , updateUserProfileDetails,
+updateUserAvatar
+ } = require("../controllers/userController")
 
 const { isAuthenticated, AdminRoute, limitRequests } = require("../middleware/auth")
 const router = express.Router()
@@ -14,7 +17,8 @@ router.route('/forgot/password').post(forgotPassword)
 router.route('/password/reset/:token').put(resetPassword)
 router.route('/getUserDetails').get(isAuthenticated, getUserDetails)
 router.route('/updateUserPassword').put(isAuthenticated, updateUserPassword)
-router.route('/updateUserProfile').put(upload.single('avatar'), isAuthenticated, updateUserProfile)
+router.route('/updateUserProfileDetails').put(isAuthenticated, updateUserProfileDetails)
+router.route('/updateUserAvatar').put(upload.single('avatar'), isAuthenticated, updateUserAvatar)
 
 
 //admin routes
