@@ -33,7 +33,7 @@ exports.createOrder = asyncHandler(async (req, res) => {
         shippingPrice,
         totalPrice,
         paidAt: Date.now(),
-        user: req.user._id,
+        user: req.user?.id,
     });
 
     res.status(201).json(new ApiResponse(201, order, "Order created successfully"));

@@ -147,7 +147,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
 
 // Get logged-in user details
 exports.getUserDetails = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
+  const user = await User.findById(req.user?.id);
   res.status(200).json(new ApiResponse(200, user, "User details retrieved successfully"));
 });
 
@@ -159,7 +159,7 @@ exports.getUserDetails = asyncHandler(async (req, res) => {
 exports.updateUserPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword, confirmPassword } = req.body;
 
-  const user = await User.findById(req.user._id).select("+password");
+  const user = await User.findById(req.user?.id).select("+password");
   if (!user) throw new ApiError(404, "Invalid or expired token");
 
   const EnterOldPass = await bcrypt.compare(oldPassword, user.password);
@@ -181,11 +181,11 @@ exports.updateUserPassword = asyncHandler(async (req, res) => {
 // Update logged-in user profile
 exports.updateUserProfileDetails = asyncHandler(async (req, res) => {
   const { username, email } = req.body;
-  const users = await User.findById(req.user?._id);
+  const users = await User.findById(req.user?.id);
   if (!users) throw new ApiError(404, "User not found");
 
   const user = await User.findByIdAndUpdate(
-    req.user?._id,
+    req.user?.id,
     {
       username:username,
       email:email,
@@ -201,7 +201,7 @@ exports.updateUserProfileDetails = asyncHandler(async (req, res) => {
 // update user avatar pic
 exports.updateUserAvatar = asyncHandler(async (req,res)=>{
   const avatar = req?.file?.path;
-  const user = await User.findById(req.user?._id);
+  const user = await User.findById(req.user?.id);
   if (!user) throw new ApiError(404, "User not found");
 
   const publicId = extractId(user?.avatar)
@@ -209,7 +209,7 @@ exports.updateUserAvatar = asyncHandler(async (req,res)=>{
 
   const myCloud = await cloudinaryUploadImg(avatar)
   const updatedUser = await User.findByIdAndUpdate(
-    req.user?._id,
+    req.user?.id,
     {
       avatar:myCloud?.secure_url
     },

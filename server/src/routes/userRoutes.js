@@ -22,10 +22,10 @@ router.route('/updateUserAvatar').put(upload.single('avatar'), isAuthenticated, 
 
 
 //admin routes
-router.route('/admin/getAllUsers').get(isAuthenticated, AdminRoute("admin"), getAllUsers)
-router.route('/admin/getSingleUser/:id').get(isAuthenticated, AdminRoute("admin"), getSingleUser)
-router.route('/admin/updateUserRole/:id').put(isAuthenticated, AdminRoute("admin"), updateUserRole)
-router.route('/admin/deleteUser/:id').delete(isAuthenticated, AdminRoute("admin"), deleteUser)
+router.route('/admin/getAllUsers').get(isAuthenticated, AdminRoute, getAllUsers)
+router.route('/admin/getSingleUser/:id').get(isAuthenticated, AdminRoute, getSingleUser)
+router.route('/admin/updateUserRole/:id').put(isAuthenticated, AdminRoute, updateUserRole)
+router.route('/admin/deleteUser/:id').delete(isAuthenticated, AdminRoute, deleteUser)
 
 
 

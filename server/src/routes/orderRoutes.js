@@ -15,9 +15,9 @@ router.route("/myOrders").get(isAuthenticated, myOrders)
 
 
 // admin Routes
-router.route("/admin/allOrders").get(isAuthenticated, AdminRoute("admin"), getAllOrders)
-router.route("/admin/finalStatus/:id").put(isAuthenticated, AdminRoute("admin"), UpdateOrderStatus)
-router.route("/admin/deleteOrder/:id").delete(isAuthenticated, AdminRoute("admin"), deleteOrder)
+router.route("/admin/allOrders").get(isAuthenticated, AdminRoute, getAllOrders)
+router.route("/admin/finalStatus/:id").put(isAuthenticated, AdminRoute, UpdateOrderStatus)
+router.route("/admin/deleteOrder/:id").delete(isAuthenticated, AdminRoute, deleteOrder)
 
 
 module.exports = router;

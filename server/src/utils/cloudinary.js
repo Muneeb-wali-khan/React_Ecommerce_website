@@ -21,6 +21,31 @@ const cloudinaryUploadImg = async (filePath) => {
   }
 };
 
+const cloudinaryUploadPrImagesMany = async(files) => {
+  try {
+    const uploadPromises = files.map((file) => {
+      return new Promise((resolve, reject) => {
+        cloudinary.uploader.upload(file.path, {
+          folder: "products",
+          resource_type: "auto",
+        }, (error, result) => {
+          fs.unlinkSync(file.path);
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        });
+      });
+    });
+
+    const results = await Promise.all(uploadPromises);
+    return results;
+  } catch (error) {
+    return null;
+  }
+}
+
 const RemovecloudinaryExistingImg = async (publicId) => {
   try {
     const res = await cloudinary.uploader
@@ -38,4 +63,4 @@ const RemovecloudinaryExistingImg = async (publicId) => {
   }
 };
 
-module.exports = { cloudinaryUploadImg, RemovecloudinaryExistingImg };
+module.exports = { cloudinaryUploadImg, RemovecloudinaryExistingImg,cloudinaryUploadPrImagesMany };

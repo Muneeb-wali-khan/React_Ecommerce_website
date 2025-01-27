@@ -3,31 +3,54 @@ const asyncHandler = require("../utils/asyncHandler");
 const cloudinary = require("cloudinary");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
+const { cloudinaryUploadPrImagesMany } = require("../utils/cloudinary");
+const productModel = require("../models/productModel");
+const { extractIdProductsImages } = require("../utils/extractCloudinaryId");
 
 exports.createProduct = asyncHandler(async (req, res) => {
-    const images = req.file.path;
-    req.body.user = req.user._id;
+    const images = req?.files;
+    const userId = req.user?.id;
 
-    const myCloud = await cloudinary.v2.uploader.upload(images, {
-        folder: "products",
-        width: 300,
-        crop: "scale",
-    });
+    const  {
+        name,
+        description,
+        ratings,
+        price,
+        category,
+        stock,
+        numOfReviews,
+        reveiws,
+    } = req.body
 
-    const imagesUp = [{
-        public_id: myCloud.public_id,
-        url: myCloud.secure_url,
-    }];
+    const myCloud = await cloudinaryUploadPrImagesMany(images)
 
-    req.body.images = imagesUp;
+    if(myCloud){
+        const mapOverUrls = myCloud.map((res)=>{
+            return {
+                url: res?.secure_url,
+            }
+        })
 
-    const product = await Product.create(req.body);
+        const createPr = await productModel.create({
+            name,
+            description,
+            ratings,
+            price,
+            category,
+            stock,
+            numOfReviews,
+            reveiws: [],
+            images: [...mapOverUrls],
+            user: userId
+        })
 
-    if (product) {
-        return res.status(201).json(new ApiResponse(201, null, "Product created successfully"));
-    } else {
-        throw new ApiError(400, "Product creation failed");
+        if (createPr) {
+            return res.status(201).json(new ApiResponse(201, createPr, "Product created successfully"));
+        } else {
+            throw new ApiError(400, "Product creation failed");
+        }
     }
+
 });
 
 exports.allProducts = asyncHandler(async (req, res) => {
@@ -67,45 +90,43 @@ exports.allProducts = asyncHandler(async (req, res) => {
 });
 
 exports.updateProduct = asyncHandler(async (req, res) => {
+    const images = req?.files;
+    const userId = req.user?.id;
+
     const product = await Product.findById(req.params.id);
 
     if (!product) {
         throw new ApiError(404, "Product not found");
     }
 
-    if (req.body.images === "") {
-        req.body.images = {
-            public_id: product.images[0].public_id,
-            url: product.images[0].url,
-        };
-    } else {
-        const images = req.file.path;
-        const imageId = product.images[0].public_id;
-        if (imageId) await cloudinary.v2.uploader.destroy(imageId);
+    const  {
+        name,
+        description,
+        ratings,
+        price,
+        category,
+        stock,
+        numOfReviews,
+        reveiws,
+    } = req.body
 
-        const myCloud = await cloudinary.v2.uploader.upload(images, {
-            folder: "products",
-            width: 300,
-            crop: "scale",
-        });
+    const extractIds = extractIdProductsImages(product?.images)
+console.log(extractIds);
 
-        req.body.images = [{
-            public_id: myCloud.public_id,
-            url: myCloud.secure_url,
-        }];
-    }
+    // const myCloud = await cloudinaryUploadPrImagesMany(images)
 
-    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, {
-        new: true,
-        runValidators: true,
-        useFindAndModify: false,
-    });
 
-    if (updatedProduct) {
-        return res.status(200).json(new ApiResponse(200, null, "Product updated successfully"));
-    } else {
-        throw new ApiError(400, "Product update failed");
-    }
+    // const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, {
+    //     new: true,
+    //     runValidators: true,
+    //     useFindAndModify: false,
+    // });
+
+    // if (updatedProduct) {
+    //     return res.status(200).json(new ApiResponse(200, null, "Product updated successfully"));
+    // } else {
+    //     throw new ApiError(400, "Product update failed");
+    // }
 });
 
 exports.deleteProduct = asyncHandler(async (req, res) => {
@@ -136,7 +157,7 @@ exports.createProductReview = asyncHandler(async (req, res) => {
     const review = {
         user: req.user._id,
         username: req.user.username,
-        rating: Number(rating),
+        rating: Number(rating).toFixed(1),
         comment,
         createdAt: new Date().toLocaleDateString('en-US', {
             day: 'numeric',
@@ -167,7 +188,7 @@ exports.createProductReview = asyncHandler(async (req, res) => {
 
     await product.save({ validateBeforeSave: false });
 
-    return res.status(200).json(new ApiResponse(200, null, "Review added successfully"));
+    return res.status(200).json(new ApiResponse(200, product, "Review added successfully"));
 });
 
 exports.getProductReviews = asyncHandler(async (req, res) => {

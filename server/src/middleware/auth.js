@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
-const rateLimter = require("express-rate-limit")
+const rateLimter = require("express-rate-limit");
 
 exports.limitRequests = rateLimter({
   windowMs: 10 * 60 * 1000, // 10 minutes
@@ -20,26 +20,29 @@ exports.limitRequests = rateLimter({
 });
 
 exports.isAuthenticated = asyncHandler(async (req, res, next) => {
-  const { token } = req.cookies;
-
-  if (!token) {
-    throw new ApiError(401, "You are not logged in to access this page");
-  }
-
   try {
-    // Verify token with explicit error handling
-    const decoded = jwt.verify(token, process.env.Jwt_Secret_Key, {
-      algorithms: ["HS256"],
-    });
+    const token =
+      req.cookies?.token ||
+      req.header("Authorization")?.replace("Bearer ", "");
 
-    const user = await User.findById(decoded.id);
+    if (!token) {
+      throw new ApiError(401, "Unauthorized no token !");
+    }
+
+    // decode the token
+    const decodedToken = jwt.verify(token, process.env.Jwt_Secret_Key);
+
+    // find user by id in decoded token
+    const user = await User.findById(decodedToken?.id).select(
+      "-password"
+    );
 
     if (!user) {
-      throw new ApiError(401, "User not found");
+      throw new ApiError(401, "invalid access token !");
     }
 
     req.user = {
-      _id: user._id,
+      id: user._id,
       username: user.username,
       email: user.email,
       role: user.role
@@ -47,25 +50,24 @@ exports.isAuthenticated = asyncHandler(async (req, res, next) => {
 
     next();
   } catch (error) {
-    // Comprehensive error handling
-    switch (error.name) {
-      case "TokenExpiredError":
-        throw new ApiError(401, "Session expired, please log in again");
-      case "JsonWebTokenError":
-        throw new ApiError(401, "Invalid token");
-      case "NotBeforeError":
-        throw new ApiError(401, "Token not yet active");
-      default:
-        throw new ApiError(500, "Authentication error");
-    }
+    throw new ApiError(401, error?.message || "invalid access token !");
   }
 });
 
-exports.AdminRoute = (...roles) => {
-  return (req, res, next) => {
-    if (!req.user || !roles.some((role) => req.user.role.includes(role))) {
-      throw new ApiError(403, "Unauthorized to access this route");
+
+
+exports.AdminRoute = (req, res, next) => {
+  try {
+
+    if (req?.user?.role !== "admin") {
+      throw new ApiError(401, "Unauthorized access !");
     }
+
     next();
-  };
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error"
+    });
+  }
 };

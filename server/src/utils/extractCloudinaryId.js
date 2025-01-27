@@ -6,4 +6,14 @@ function extractId(url) {
     return publicId[0]
 }
 
-module.exports = extractId
+function extractIdProductsImages(urls){
+    const images = urls?.map((url)=>{
+        const avatar  = url?.split("/")
+        const publicId = avatar[8]?.split('.')
+        return publicId[0]
+    })
+
+    return images
+}
+
+module.exports = {extractId, extractIdProductsImages}
