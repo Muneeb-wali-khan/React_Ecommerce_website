@@ -90,7 +90,6 @@ exports.allProducts = asyncHandler(async (req, res) => {
 });
 
 exports.updateProduct = asyncHandler(async (req, res) => {
-    const images = req?.files;
     const userId = req.user?.id;
 
     const product = await Product.findById(req.params.id);
@@ -126,6 +125,35 @@ console.log(extractIds);
     //     return res.status(200).json(new ApiResponse(200, null, "Product updated successfully"));
     // } else {
     //     throw new ApiError(400, "Product update failed");
+    // }
+});
+
+exports.updateProductImages = asyncHandler(async (req, res) => {
+    const product = await productModel.findById(req.params.id);
+
+    if (!product) {
+        throw new ApiError(404, "Product not found");
+    }
+
+    const images = req?.files;
+
+    const extractIds = extractIdProductsImages(product?.images)
+    console.log("ids",images);
+
+    // const myCloud = await cloudinaryUploadPrImagesMany(images)
+
+    // if(myCloud){
+    //     const mapOverUrls = myCloud.map((res)=>{
+    //         return {
+    //             url: res?.secure_url,
+    //         }
+    //     })
+
+    //     product.images = [...product.images, ...mapOverUrls]
+
+    //     await product.save({ validateBeforeSave: false });
+
+    //     return res.status(200).json(new ApiResponse(200, product, "Product images updated successfully"));
     // }
 });
 

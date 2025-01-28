@@ -47,6 +47,7 @@ exports.isAuthenticated = asyncHandler(async (req, res, next) => {
       email: user.email,
       role: user.role
     };
+console.log("logged in");
 
     next();
   } catch (error) {
@@ -62,6 +63,7 @@ exports.AdminRoute = (req, res, next) => {
     if (req?.user?.role !== "admin") {
       throw new ApiError(401, "Unauthorized access !");
     }
+    console.log("admin bhia");
 
     next();
   } catch (error) {

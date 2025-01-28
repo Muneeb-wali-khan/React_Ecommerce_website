@@ -46,6 +46,29 @@ const cloudinaryUploadPrImagesMany = async(files) => {
   }
 }
 
+const removePrImagesFromCloudinary = async (publicIds) => {
+  try {
+    const deletePromises = publicIds.map((publicId) => {
+      return new Promise((resolve, reject) => {
+        cloudinary.uploader.destroy(publicId, {
+          resource_type: "image",
+        }, (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        });
+      });
+    });
+
+    const results = await Promise.all(deletePromises);
+    return results;
+  } catch (error) {
+    return null;
+  }
+};
+
 const RemovecloudinaryExistingImg = async (publicId) => {
   try {
     const res = await cloudinary.uploader
