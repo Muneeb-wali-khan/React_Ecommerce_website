@@ -46,28 +46,24 @@ const cloudinaryUploadPrImagesMany = async(files) => {
   }
 }
 
-const removePrImagesFromCloudinary = async (publicIds) => {
-  try {
-    const deletePromises = publicIds.map((publicId) => {
-      return new Promise((resolve, reject) => {
-        cloudinary.uploader.destroy(publicId, {
-          resource_type: "image",
-        }, (error, result) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(result);
-          }
-        });
-      });
-    });
 
-    const results = await Promise.all(deletePromises);
-    return results;
+
+const removePrImagesFromCloudinary = async (publicIds) => {
+  if (!publicIds || publicIds.length === 0) {
+    console.log("No public IDs provided.");
+    return [];
+  }
+
+  try {
+    const result = await cloudinary.api.delete_resources(publicIds, { resource_type: "image" });
+
+    return result;
   } catch (error) {
+    console.error("Error deleting images from Cloudinary:", error);
     return null;
   }
 };
+
 
 const RemovecloudinaryExistingImg = async (publicId) => {
   try {
@@ -86,4 +82,4 @@ const RemovecloudinaryExistingImg = async (publicId) => {
   }
 };
 
-module.exports = { cloudinaryUploadImg, RemovecloudinaryExistingImg,cloudinaryUploadPrImagesMany };
+module.exports = { cloudinaryUploadImg, RemovecloudinaryExistingImg,cloudinaryUploadPrImagesMany ,removePrImagesFromCloudinary};

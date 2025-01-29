@@ -1,7 +1,7 @@
 const express = require("express")
 const { isAuthenticated, AdminRoute } = require("../middleware/auth");
 
-const { createProduct, allProducts, updateProduct, deleteProduct, getProductDetails, createProductReview, getProductReviews, deleteProductReview, updateProductImages } = require("../controllers/productController");
+const { createProduct, allProducts, updateProduct, deleteProduct, getProductDetails, createProductReview, getProductReviews, deleteProductReview, updateProductImgs } = require("../controllers/productController");
 const multer = require( 'multer');
 const  ApiError = require( '../utils/ApiError');
 
@@ -20,7 +20,7 @@ router.route('/deleteProductReview').delete(isAuthenticated, deleteProductReview
 // admin routes
 router.route('/admin/createProduct').post(isAuthenticated,AdminRoute,upload.array("images",4), createProduct)
 router.route('/admin/updateProduct/:id').put(isAuthenticated,AdminRoute, updateProduct)
-router.route('/admin/updateProductImgs/:id').put(isAuthenticated,AdminRoute,upload.array("images",4),updateProductImages)
+router.route('/admin/update-product-images/:id').put(isAuthenticated,AdminRoute,upload.array("images",4),updateProductImgs)
 router.route('/admin/deleteProduct/:id').delete(isAuthenticated,AdminRoute, deleteProduct)
 
 

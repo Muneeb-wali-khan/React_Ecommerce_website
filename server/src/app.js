@@ -30,13 +30,13 @@ app.use("/api", payment);
 // middleware to show error response in json send to client
 // comment it when developing backend to trace error
 
-// app.use((error, req, res, next) => {
-//   error.statusCode = error.statusCode || 500;
-//   error.statusCode = error.statusCode || "error";
-//   res.status(error.statusCode).json({
-//     statusCode: error.statusCode,
-//     message: error.message,
-//   });
-// });
+app.use((error, req, res, next) => {
+  error.statusCode = error.statusCode || 500;
+  error.statusCode = error.statusCode || "error";
+  res.status(error.statusCode).json({
+    statusCode: error.statusCode,
+    message: error.message,
+  });
+});
 
 module.exports = { app };

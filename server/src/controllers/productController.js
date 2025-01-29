@@ -3,7 +3,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const cloudinary = require("cloudinary");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
-const { cloudinaryUploadPrImagesMany } = require("../utils/cloudinary");
+const { cloudinaryUploadPrImagesMany, removePrImagesFromCloudinary } = require("../utils/cloudinary");
 const productModel = require("../models/productModel");
 const { extractIdProductsImages } = require("../utils/extractCloudinaryId");
 
@@ -128,34 +128,36 @@ console.log(extractIds);
     // }
 });
 
-exports.updateProductImages = asyncHandler(async (req, res) => {
-    const product = await productModel.findById(req.params.id);
+exports.updateProductImgs = asyncHandler(async(req,res)=>{
+    const images = req?.files;
+    const product = await Product.findById(req.params.id);
 
     if (!product) {
         throw new ApiError(404, "Product not found");
     }
 
-    const images = req?.files;
 
-    const extractIds = extractIdProductsImages(product?.images)
-    console.log("ids",images);
+    const publicIds = extractIdProductsImages(product?.images)
 
-    // const myCloud = await cloudinaryUploadPrImagesMany(images)
+    const deleteOldImages = await removePrImagesFromCloudinary(publicIds)
 
-    // if(myCloud){
-    //     const mapOverUrls = myCloud.map((res)=>{
-    //         return {
-    //             url: res?.secure_url,
-    //         }
-    //     })
+    const myCloud = await cloudinaryUploadPrImagesMany(images)
 
-    //     product.images = [...product.images, ...mapOverUrls]
+    if(myCloud){
+        const mapOverUrls = myCloud?.map((res)=>{
+            return {
+                url: res?.secure_url,
+            }
+        })
 
-    //     await product.save({ validateBeforeSave: false });
+        product.images = [...mapOverUrls]
 
-    //     return res.status(200).json(new ApiResponse(200, product, "Product images updated successfully"));
-    // }
-});
+        await product.save({ validateBeforeSave: false });
+
+        return res.status(200).json(new ApiResponse(200, product, "Product images updated successfully"));
+    }
+    
+})
 
 exports.deleteProduct = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id);
